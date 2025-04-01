@@ -14,14 +14,14 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background: linear-gradient(to bottom, #87CEEB, #4682B4); /* 渐变天空背景 */
+            background: linear-gradient(to bottom, #87CEEB, #4682B4);
             font-family: Arial, sans-serif;
         }
         #game-container {
             position: relative;
             width: 800px;
             height: 400px;
-            background: #000; /* 游戏区域黑色背景 */
+            background: #000;
             border: 4px solid #333;
             border-radius: 8px;
             overflow: hidden;
@@ -41,7 +41,6 @@
             transform: translate(-50%, -50%);
             color: #fff;
             font-size: 20px;
-            text-shadow: 1px 1px 2px #000;
         }
     </style>
 </head>
@@ -68,7 +67,8 @@
             scale: {
                 mode: Phaser.Scale.FIT,
                 autoCenter: Phaser.Scale.CENTER_BOTH
-            }
+            },
+            fps: { target: 30 } // 限制帧率，减少性能压力
         };
 
         let game = new Phaser.Game(config);
@@ -80,6 +80,10 @@
             this.load.on('complete', () => {
                 document.getElementById('loading').style.display = 'none';
             });
+            this.load.on('loaderror', (file) => {
+                console.error('Failed to load:', file.key); // 调试资源加载失败
+            });
+            // 使用可靠的在线资源
             this.load.image('tank', 'https://labs.phaser.io/assets/sprites/tank.png');
             this.load.image('plane', 'https://labs.phaser.io/assets/sprites/plane.png');
             this.load.image('enemyTank', 'https://labs.phaser.io/assets/sprites/enemy-tank.png');
@@ -95,10 +99,10 @@
             tank = this.physics.add.sprite(100, 350, 'tank').setScale(0.5);
             tank.setCollideWorldBounds(true);
 
-            planes = this.physics.add.group();
-            enemyTanks = this.physics.add.group();
-            bosses = this.physics.add.group();
-            bullets = this.physics.add.group();
+            planes = this.physics.add.group({ maxSize: 10 }); // 限制敌人数量
+            enemyTanks = this.physics.add.group({ maxSize: 10 });
+            bosses = this.physics.add.group({ maxSize: 1 });
+            bullets = this.physics.add.group({ maxSize: 20 });
 
             scoreText = this.add.text(10, 10, 'Score: 0', { fontSize: '20px', color: '#fff', stroke: '#000', strokeThickness: 2 });
             livesText = this.add.text(10, 30, 'Lives: 3', { fontSize: '20px', color: '#fff', stroke: '#000', strokeThickness: 2 });
@@ -114,7 +118,7 @@
         }
 
         function update() {
-            background.tilePositionX += 2 + level * 0.5;
+            background.tilePositionX += 2;
 
             if (cursors.left.isDown) {
                 tank.setVelocityX(-200);
@@ -143,7 +147,7 @@
 
         function startLevel() {
             enemySpawnRate = Math.max(500, 1500 - level * 200);
-            enemySpeedMultiplier = 1 + level * 0.2;
+            enemySpeedMultiplier = Math.min(2, 1 + level * 0.2); // 限制最大速度
             this.time.addEvent({ delay: enemySpawnRate, callback: spawnPlane, callbackScope: this, loop: true });
             this.time.addEvent({ delay: enemySpawnRate * 1.5, callback: spawnEnemyTank, callbackScope: this, loop: true });
             levelText.setText('Level: ' + level);
@@ -157,14 +161,14 @@
         }
 
         function spawnPlane() {
-            if (!bossActive) {
+            if (!bossActive && planes.getLength() < planes.maxSize) {
                 let plane = planes.create(800, Phaser.Math.Between(50, 150), 'plane').setScale(0.5);
                 plane.setVelocityX(-150 * enemySpeedMultiplier);
             }
         }
 
         function spawnEnemyTank() {
-            if (!bossActive) {
+            if (!bossActive && enemyTanks.getLength() < enemyTanks.maxSize) {
                 let enemyTank = enemyTanks.create(800, 350, 'enemyTank').setScale(0.5);
                 enemyTank.setVelocityX(-100 * enemySpeedMultiplier);
             }
@@ -180,11 +184,13 @@
         }
 
         function shootBullet() {
-            let bullet = bullets.create(tank.x, tank.y - 20, 'bullet').setScale(0.5);
-            bullet.setVelocityY(-400);
-            bullet.checkWorldBounds = true;
-            bullet.outOfBoundsKill = true;
-            this.sound.play('shoot');
+            if (bullets.getLength() < bullets.maxSize) {
+                let bullet = bullets.create(tank.x, tank.y - 20, 'bullet').setScale(0.5);
+                bullet.setVelocityY(-400);
+                bullet.checkWorldBounds = true;
+                bullet.outOfBoundsKill = true;
+                this.sound.play('shoot');
+            }
         }
 
         function hitPlane(bullet, plane) {
