@@ -68,7 +68,7 @@
                 mode: Phaser.Scale.FIT,
                 autoCenter: Phaser.Scale.CENTER_BOTH
             },
-            fps: { target: 30 } // 限制帧率，减少性能压力
+            fps: { target: 30 }
         };
 
         let game = new Phaser.Game(config);
@@ -80,26 +80,22 @@
             this.load.on('complete', () => {
                 document.getElementById('loading').style.display = 'none';
             });
-            this.load.on('loaderror', (file) => {
-                console.error('Failed to load:', file.key); // 调试资源加载失败
-            });
-            // 使用可靠的在线资源
-            this.load.image('tank', 'https://labs.phaser.io/assets/sprites/tank.png');
-            this.load.image('plane', 'https://labs.phaser.io/assets/sprites/plane.png');
-            this.load.image('enemyTank', 'https://labs.phaser.io/assets/sprites/enemy-tank.png');
-            this.load.image('boss', 'https://labs.phaser.io/assets/sprites/boss1.png');
-            this.load.image('bullet', 'https://labs.phaser.io/assets/particles/yellow.png');
-            this.load.image('background', 'https://labs.phaser.io/assets/skies/desert-back.png');
-            this.load.audio('shoot', 'https://labs.phaser.io/assets/audio/gunshot.mp3');
-            this.load.audio('explode', 'https://labs.phaser.io/assets/audio/explosion.mp3');
+
+            // 本地像素图（Base64格式）
+            this.load.image('tank', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAIAgMAAAB7wUkmAAAACVBMVEUAAAD///8AhvoXNr8QAAAAA3RSTlMA/wD/AMZ1sAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABFJREFUCNdjaGBgYGZgZgECAP4mBsfQ7mYAAAAAAElFTkSuQmCC');
+            this.load.image('plane', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAIAgMAAAB7wUkmAAAADFBMVEUAAACZmZmqqqoAAADGx+0/AAAAA3RSTlMA/wD/AMZ1sAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAADBJREFUCNdjYGBgYGBkZGJgZmZmYGBgZmZmYGBgYGBgZmZmYGBgYGBgZmZmYGBgYAAAxjUFx8Y2TksAAAAASUVORK5CYII=');
+            this.load.image('enemyTank', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAIAgMAAAB7wUkmAAAACVBMVEUAAAAAAAD/AAAApDdcAAAAA3RSTlMA/wD/AMZ1sAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABFJREFUCNdjaGBgYGZgZgECAP4mBsfQ7mYAAAAAAElFTkSuQmCC');
+            this.load.image('boss', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAIAgMAAADaQ8+2AAAADFBMVEUAAACZmZmqqqoAAADGx+0/AAAAA3RSTlMA/wD/AMZ1sAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAENJREFUCNdjYGBgYGBkZGRgZmZmYGBgZmZmYGBgYGBgZmZmYGBgYGBgZmZmYGBgYGBgZmZmYGBgYGBgZmZmYGBgYAAA8a8FxyEy5BsAAAAASUVORK5CYII=');
+            this.load.image('bullet', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAEAQMAAADuNvhMAAAABlBMVEUAAAD/AAClB01PAAAAA3RSTlMA/wD/AMZ1sAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAABBJREFUCB0BCMHBUQAJAAD//wG6mQeDvfW3RwAAAABJRU5ErkJggg==');
+            this.load.image('background', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAGAAAAAYCAQMAAADn1Y89AAAABlBMVEUAAAD/AADzY0W/AAAAA3RSTlMA/wD/AMZ1sAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAHlJREFUWMPt0bENgCAMRNEPGBBgYIAQAwYEmBggxIB9PyMg6Xa7XZaI8nOYJEn+/jYfR7PZ7Ha73W63S5IkSf7+Nh9Hs9nsdrvdbrfb7Xa73W63S5IkSf7+Nh9Hs9nsdrvdbrfb7Xa73W63S5IkSf7+Nh/Hs9n/Ac5kBjib4lYAAAAAAElFTkSuQmCC');
         }
 
         function create() {
             background = this.add.tileSprite(0, 0, 800, 400, 'background').setOrigin(0, 0);
-            tank = this.physics.add.sprite(100, 350, 'tank').setScale(0.5);
+            tank = this.physics.add.sprite(100, 350, 'tank').setScale(2); // 放大显示
             tank.setCollideWorldBounds(true);
 
-            planes = this.physics.add.group({ maxSize: 10 }); // 限制敌人数量
+            planes = this.physics.add.group({ maxSize: 10 });
             enemyTanks = this.physics.add.group({ maxSize: 10 });
             bosses = this.physics.add.group({ maxSize: 1 });
             bullets = this.physics.add.group({ maxSize: 20 });
@@ -147,7 +143,7 @@
 
         function startLevel() {
             enemySpawnRate = Math.max(500, 1500 - level * 200);
-            enemySpeedMultiplier = Math.min(2, 1 + level * 0.2); // 限制最大速度
+            enemySpeedMultiplier = Math.min(2, 1 + level * 0.2);
             this.time.addEvent({ delay: enemySpawnRate, callback: spawnPlane, callbackScope: this, loop: true });
             this.time.addEvent({ delay: enemySpawnRate * 1.5, callback: spawnEnemyTank, callbackScope: this, loop: true });
             levelText.setText('Level: ' + level);
@@ -162,14 +158,14 @@
 
         function spawnPlane() {
             if (!bossActive && planes.getLength() < planes.maxSize) {
-                let plane = planes.create(800, Phaser.Math.Between(50, 150), 'plane').setScale(0.5);
+                let plane = planes.create(800, Phaser.Math.Between(50, 150), 'plane').setScale(2);
                 plane.setVelocityX(-150 * enemySpeedMultiplier);
             }
         }
 
         function spawnEnemyTank() {
             if (!bossActive && enemyTanks.getLength() < enemyTanks.maxSize) {
-                let enemyTank = enemyTanks.create(800, 350, 'enemyTank').setScale(0.5);
+                let enemyTank = enemyTanks.create(800, 350, 'enemyTank').setScale(2);
                 enemyTank.setVelocityX(-100 * enemySpeedMultiplier);
             }
         }
@@ -177,7 +173,7 @@
         function spawnBoss() {
             bossActive = true;
             this.time.removeAllEvents();
-            let boss = bosses.create(700, 100, 'boss').setScale(1);
+            let boss = bosses.create(700, 100, 'boss').setScale(2);
             boss.setVelocityX(-50 * enemySpeedMultiplier);
             boss.health = 50;
             this.add.text(300, 50, 'Boss Fight!', { fontSize: '30px', color: '#ff0000', stroke: '#000', strokeThickness: 2 }).setDepth(1);
@@ -185,11 +181,10 @@
 
         function shootBullet() {
             if (bullets.getLength() < bullets.maxSize) {
-                let bullet = bullets.create(tank.x, tank.y - 20, 'bullet').setScale(0.5);
+                let bullet = bullets.create(tank.x, tank.y - 20, 'bullet').setScale(2);
                 bullet.setVelocityY(-400);
                 bullet.checkWorldBounds = true;
                 bullet.outOfBoundsKill = true;
-                this.sound.play('shoot');
             }
         }
 
@@ -198,7 +193,6 @@
             plane.destroy();
             score += 10;
             scoreText.setText('Score: ' + score);
-            this.sound.play('explode');
         }
 
         function hitEnemyTank(bullet, enemyTank) {
@@ -206,7 +200,6 @@
             enemyTank.destroy();
             score += 20;
             scoreText.setText('Score: ' + score);
-            this.sound.play('explode');
         }
 
         function hitBoss(bullet, boss) {
@@ -216,11 +209,8 @@
                 boss.destroy();
                 score += 100;
                 scoreText.setText('Score: ' + score);
-                this.sound.play('explode');
                 bossActive = false;
                 levelUp.call(this);
-            } else {
-                this.sound.play('explode');
             }
         }
 
@@ -228,7 +218,6 @@
             enemy.destroy();
             lives -= 1;
             livesText.setText('Lives: ' + lives);
-            this.sound.play('explode');
             if (lives <= 0) {
                 this.physics.pause();
                 this.add.text(300, 200, 'Game Over', { fontSize: '40px', color: '#ff0000', stroke: '#000', strokeThickness: 4 });
