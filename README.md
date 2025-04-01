@@ -1,5 +1,3 @@
-# Tank
-a game about Tank
 <!DOCTYPE html>
 <html>
 <head>
@@ -8,16 +6,56 @@ a game about Tank
     <title>Tank Sky Defender</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #87CEEB; }
-        canvas { max-width: 100%; max-height: 100%; }
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB, #4682B4); /* 渐变天空背景 */
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 400px;
+            background: #000; /* 游戏区域黑色背景 */
+            border: 4px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        h1 {
+            color: #fff;
+            text-shadow: 2px 2px 4px #000;
+            margin-bottom: 10px;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 20px;
+            text-shadow: 1px 1px 2px #000;
+        }
     </style>
 </head>
 <body>
+    <h1>Tank Sky Defender</h1>
+    <div id="game-container">
+        <div id="loading">Loading...</div>
+    </div>
     <script>
         const config = {
             type: Phaser.AUTO,
             width: 800,
             height: 400,
+            parent: 'game-container',
             physics: {
                 default: 'arcade',
                 arcade: { gravity: { y: 0 } }
@@ -34,54 +72,55 @@ a game about Tank
         };
 
         let game = new Phaser.Game(config);
-        let tank, planes, bullets, cursors, touchX = null;
+        let tank, planes, enemyTanks, bosses, bullets, cursors, touchX = null;
+        let score = 0, lives = 3, level = 1, scoreText, livesText, levelText, background;
+        let enemySpawnRate = 1500, enemySpeedMultiplier = 1, bossActive = false;
 
         function preload() {
-            // 使用占位符图片，实际开发时替换为坦克、飞机、子弹的图像
-            this.load.image('tank', 'https://via.placeholder.com/50x30.png?text=Tank');
-            this.load.image('plane', 'https://via.placeholder.com/40x20.png?text=Plane');
-            this.load.image('bullet', 'https://via.placeholder.com/5x15.png?text=Bullet');
+            this.load.on('complete', () => {
+                document.getElementById('loading').style.display = 'none';
+            });
+            this.load.image('tank', 'https://labs.phaser.io/assets/sprites/tank.png');
+            this.load.image('plane', 'https://labs.phaser.io/assets/sprites/plane.png');
+            this.load.image('enemyTank', 'https://labs.phaser.io/assets/sprites/enemy-tank.png');
+            this.load.image('boss', 'https://labs.phaser.io/assets/sprites/boss1.png');
+            this.load.image('bullet', 'https://labs.phaser.io/assets/particles/yellow.png');
+            this.load.image('background', 'https://labs.phaser.io/assets/skies/desert-back.png');
+            this.load.audio('shoot', 'https://labs.phaser.io/assets/audio/gunshot.mp3');
+            this.load.audio('explode', 'https://labs.phaser.io/assets/audio/explosion.mp3');
         }
 
         function create() {
-            // 创建坦克
-            tank = this.physics.add.sprite(100, 350, 'tank');
+            background = this.add.tileSprite(0, 0, 800, 400, 'background').setOrigin(0, 0);
+            tank = this.physics.add.sprite(100, 350, 'tank').setScale(0.5);
             tank.setCollideWorldBounds(true);
 
-            // 创建飞机和子弹组
             planes = this.physics.add.group();
+            enemyTanks = this.physics.add.group();
+            bosses = this.physics.add.group();
             bullets = this.physics.add.group();
 
-            // 键盘控制
-            cursors = this.input.keyboard.createCursorKeys();
+            scoreText = this.add.text(10, 10, 'Score: 0', { fontSize: '20px', color: '#fff', stroke: '#000', strokeThickness: 2 });
+            livesText = this.add.text(10, 30, 'Lives: 3', { fontSize: '20px', color: '#fff', stroke: '#000', strokeThickness: 2 });
+            levelText = this.add.text(700, 10, 'Level: 1', { fontSize: '20px', color: '#fff', stroke: '#000', strokeThickness: 2 });
 
-            // 手机触控支持
+            cursors = this.input.keyboard.createCursorKeys();
             this.input.addPointer(1);
-            this.input.on('pointermove', (pointer) => {
-                touchX = pointer.x;
-            });
+            this.input.on('pointermove', (pointer) => { touchX = pointer.x; });
             this.input.on('pointerdown', () => shootBullet.call(this));
 
-            // 每隔1.5秒生成飞机
-            this.time.addEvent({
-                delay: 1500,
-                callback: spawnPlane,
-                callbackScope: this,
-                loop: true
-            });
-
-            // 碰撞检测
-            this.physics.add.collider(bullets, planes, hitPlane, null, this);
+            startLevel.call(this);
+            createCollisions.call(this);
         }
 
         function update() {
-            // 键盘控制坦克移动
+            background.tilePositionX += 2 + level * 0.5;
+
             if (cursors.left.isDown) {
                 tank.setVelocityX(-200);
             } else if (cursors.right.isDown) {
                 tank.setVelocityX(200);
             } else if (touchX !== null) {
-                // 手机触控移动
                 if (touchX < tank.x) tank.setVelocityX(-200);
                 else if (touchX > tank.x) tank.setVelocityX(200);
                 else tank.setVelocityX(0);
@@ -89,27 +128,114 @@ a game about Tank
                 tank.setVelocityX(0);
             }
 
-            // 空格键射击
             if (Phaser.Input.Keyboard.JustDown(cursors.space)) {
                 shootBullet.call(this);
             }
+
+            if (!bossActive && planes.countActive() === 0 && enemyTanks.countActive() === 0 && score >= level * 50) {
+                if (level % 5 === 0) {
+                    spawnBoss.call(this);
+                } else {
+                    levelUp.call(this);
+                }
+            }
+        }
+
+        function startLevel() {
+            enemySpawnRate = Math.max(500, 1500 - level * 200);
+            enemySpeedMultiplier = 1 + level * 0.2;
+            this.time.addEvent({ delay: enemySpawnRate, callback: spawnPlane, callbackScope: this, loop: true });
+            this.time.addEvent({ delay: enemySpawnRate * 1.5, callback: spawnEnemyTank, callbackScope: this, loop: true });
+            levelText.setText('Level: ' + level);
+            bossActive = false;
+        }
+
+        function levelUp() {
+            level += 1;
+            this.time.removeAllEvents();
+            startLevel.call(this);
         }
 
         function spawnPlane() {
-            let plane = planes.create(800, Phaser.Math.Between(50, 150), 'plane');
-            plane.setVelocityX(-150); // 飞机向左飞
+            if (!bossActive) {
+                let plane = planes.create(800, Phaser.Math.Between(50, 150), 'plane').setScale(0.5);
+                plane.setVelocityX(-150 * enemySpeedMultiplier);
+            }
+        }
+
+        function spawnEnemyTank() {
+            if (!bossActive) {
+                let enemyTank = enemyTanks.create(800, 350, 'enemyTank').setScale(0.5);
+                enemyTank.setVelocityX(-100 * enemySpeedMultiplier);
+            }
+        }
+
+        function spawnBoss() {
+            bossActive = true;
+            this.time.removeAllEvents();
+            let boss = bosses.create(700, 100, 'boss').setScale(1);
+            boss.setVelocityX(-50 * enemySpeedMultiplier);
+            boss.health = 50;
+            this.add.text(300, 50, 'Boss Fight!', { fontSize: '30px', color: '#ff0000', stroke: '#000', strokeThickness: 2 }).setDepth(1);
         }
 
         function shootBullet() {
-            let bullet = bullets.create(tank.x, tank.y - 20, 'bullet');
-            bullet.setVelocityY(-400); // 子弹向上发射
+            let bullet = bullets.create(tank.x, tank.y - 20, 'bullet').setScale(0.5);
+            bullet.setVelocityY(-400);
             bullet.checkWorldBounds = true;
-            bullet.outOfBoundsKill = true; // 出界销毁
+            bullet.outOfBoundsKill = true;
+            this.sound.play('shoot');
         }
 
         function hitPlane(bullet, plane) {
             bullet.destroy();
             plane.destroy();
+            score += 10;
+            scoreText.setText('Score: ' + score);
+            this.sound.play('explode');
+        }
+
+        function hitEnemyTank(bullet, enemyTank) {
+            bullet.destroy();
+            enemyTank.destroy();
+            score += 20;
+            scoreText.setText('Score: ' + score);
+            this.sound.play('explode');
+        }
+
+        function hitBoss(bullet, boss) {
+            bullet.destroy();
+            boss.health -= 1;
+            if (boss.health <= 0) {
+                boss.destroy();
+                score += 100;
+                scoreText.setText('Score: ' + score);
+                this.sound.play('explode');
+                bossActive = false;
+                levelUp.call(this);
+            } else {
+                this.sound.play('explode');
+            }
+        }
+
+        function takeDamage(tank, enemy) {
+            enemy.destroy();
+            lives -= 1;
+            livesText.setText('Lives: ' + lives);
+            this.sound.play('explode');
+            if (lives <= 0) {
+                this.physics.pause();
+                this.add.text(300, 200, 'Game Over', { fontSize: '40px', color: '#ff0000', stroke: '#000', strokeThickness: 4 });
+            }
+        }
+
+        function createCollisions() {
+            this.physics.add.collider(bullets, planes, hitPlane, null, this);
+            this.physics.add.collider(bullets, enemyTanks, hitEnemyTank, null, this);
+            this.physics.add.collider(bullets, bosses, hitBoss, null, this);
+            this.physics.add.collider(tank, planes, takeDamage, null, this);
+            this.physics.add.collider(tank, enemyTanks, takeDamage, null, this);
+            this.physics.add.collider(tank, bosses, takeDamage, null, this);
         }
     </script>
 </body>
